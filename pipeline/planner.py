@@ -104,7 +104,10 @@ def plan_offline(prompt: str, routes: dict) -> MissionPlan:
         # pick target class from a small vocabulary
         classes = ("person", "car", "truck", "bus", "motorcycle",
                    "bicycle", "dog", "cat", "sheep", "cow", "horse")
-        target = next((c for c in classes if c in p), "person")
+        # Grab ANY noun-ish word after the follow verb; validator gates it.
+ 
+        m = re.search(r"(?:follow|chase|track|tail)\s+(?:the\s+|any\s+)?(\w+)", p)
+        target = m.group(1) if m else "person"
         return MissionPlan(
             action="follow_target",
             target_class=target,
