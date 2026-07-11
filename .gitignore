@@ -1,13 +1,13 @@
-# ============================================================
-# Python
-# ============================================================
+
+
+
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 
-# Virtual environments (venv, vision-venv, .venv, etc.)
+
 venv/
 vision-venv/
 .venv/
@@ -16,7 +16,7 @@ ENV/
 env.bak/
 venv.bak/
 
-# Distribution / packaging
+
 build/
 dist/
 *.egg-info/
@@ -24,7 +24,7 @@ dist/
 .eggs/
 pip-wheel-metadata/
 
-# Testing / coverage
+
 .pytest_cache/
 .coverage
 .coverage.*
@@ -32,71 +32,71 @@ htmlcov/
 .tox/
 .nox/
 
-# Type checkers
+
 .mypy_cache/
 .pyre/
 .pyright/
 
-# ============================================================
-# Machine learning / model weights
-# ============================================================
-# YOLO weights get auto-downloaded on first use — no need to commit
+
+
+
+
 *.pt
 *.onnx
 *.engine
 *.tflite
 *.pb
-runs/                 # ultralytics training / prediction runs
+runs/
 
-# ============================================================
-# Simulation data (the disk-eaters)
-# ============================================================
-# PX4 flight logs — these grow to hundreds of MB per session
+
+
+
+
 *.ulg
 *.ulog
-PX4-Autopilot/        # if it ever ends up nested in your repo
+PX4-Autopilot/
 build_px4_sitl_default/
 
-# Gazebo world state / cache
+
 .gz/
 gz_cache/
 
-# ROS 2 leftovers
+
 log/
 install/
 
-# ============================================================
-# Runtime artefacts produced by the pipeline
-# ============================================================
-detections/           # YOLO annotated JPG output — regenerable, potentially huge
-missions/last_mission.json   # audit artefact regenerated on every run
+
+
+
+detections/
+missions/last_mission.json
 missions/*.json.bak
 
-# Shared state between detector and follow controller
-/tmp/target_state.json        # not typically committed, listed for clarity
 
-# ============================================================
-# Docker
-# ============================================================
-# Keep Dockerfile and docker-compose.yml — those are the recipe.
-# But local overrides shouldn't be committed.
+/tmp/target_state.json
+
+
+
+
+
+
 docker-compose.override.yml
 .docker/
 
-# ============================================================
-# Secrets — never commit
-# ============================================================
+
+
+
 .env
 .env.*
-!.env.example         # a template with placeholder values IS ok
+!.env.example
 *.pem
 *.key
 secrets.yaml
 credentials.json
 
-# ============================================================
-# Editor / IDE
-# ============================================================
+
+
+
 .vscode/
 .idea/
 *.swp
@@ -105,21 +105,21 @@ credentials.json
 .DS_Store
 Thumbs.db
 
-# ============================================================
-# Media captures (large, keep out of git; back up separately)
-# ============================================================
+
+
+
 recordings/
 videos/
 *.mp4
 *.mov
 *.webm
 *.mkv
-# Screenshots are usually fine, but if you accumulate many:
-# *.png
-# *.jpg
 
-# ============================================================
-# Node / npm (only if you add a JS toolchain later)
-# ============================================================
+
+
+
+
+
+
 node_modules/
 npm-debug.log*
