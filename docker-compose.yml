@@ -1,0 +1,19 @@
+# Reproducible two-container setup:
+#   px4-sim : PX4 SITL + headless Gazebo (jonasvautherin/px4-gazebo-headless)
+#   pipeline: this repo's planner/validator/executor
+#
+# Run:  docker compose up -d px4-sim
+#       docker compose run pipeline "Patrol the perimeter loop twice at 15 metres"
+services:
+  px4-sim:
+    image: jonasvautherin/px4-gazebo-headless:1.14.3
+    network_mode: host
+    command: ["127.0.0.1", "127.0.0.1"]
+
+  pipeline:
+    build: .
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    network_mode: host
+    entrypoint: ["python", "-m", "pipeline.main"]
+

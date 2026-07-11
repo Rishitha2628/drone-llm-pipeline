@@ -1,0 +1,29 @@
+# Pre-defined routes, in local NED metres relative to the launch point.
+# Waypoints are [north_m, east_m]. Altitude/speed come from the mission plan.
+routes:
+  perimeter:
+    description: "Square perimeter loop around the launch area, 40 m sides"
+    waypoints:
+      - [20, -20]
+      - [20, 20]
+      - [-20, 20]
+      - [-20, -20]
+      - [20, -20]   # close the loop
+  inspection:
+    description: "L-shaped inspection route along two fence lines"
+    waypoints:
+      - [0, 0]
+      - [30, 0]
+      - [30, 25]
+      - [0, 0]      # return to start
+  survey_lawnmower:
+    description: "Lawnmower sweep of a 40x30 m area"
+    waypoints:
+      - [0, 0]
+      - [40, 0]
+      - [40, 10]
+      - [0, 10]
+      - [0, 20]
+      - [40, 20]
+      - [40, 30]
+      - [0, 30]
