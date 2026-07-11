@@ -1,0 +1,32 @@
+# Gazebo Harmonic -> ROS 2 Humble bridge config for RTAB-Map.
+# Passed to ros_gz_bridge parameter_bridge via --ros-args -p config_file:=this.
+#
+# We bridge only what SLAM needs:
+#   - depth image (as sensor_msgs/Image, encoding=32FC1 metres)
+#   - camera info (intrinsics needed to project depth into 3D)
+#   - point cloud (some RTAB-Map configs use this directly)
+#   - clock (so ROS 2 stamps match sim time)
+
+- ros_topic_name: "/depth_camera"
+  gz_topic_name: "/depth_camera"
+  ros_type_name: "sensor_msgs/msg/Image"
+  gz_type_name: "gz.msgs.Image"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/depth_camera/points"
+  gz_topic_name: "/depth_camera/points"
+  ros_type_name: "sensor_msgs/msg/PointCloud2"
+  gz_type_name: "gz.msgs.PointCloudPacked"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/camera_info"
+  gz_topic_name: "/camera_info"
+  ros_type_name: "sensor_msgs/msg/CameraInfo"
+  gz_type_name: "gz.msgs.CameraInfo"
+  direction: GZ_TO_ROS
+
+- ros_topic_name: "/clock"
+  gz_topic_name: "/clock"
+  ros_type_name: "rosgraph_msgs/msg/Clock"
+  gz_type_name: "gz.msgs.Clock"
+  direction: GZ_TO_ROS
