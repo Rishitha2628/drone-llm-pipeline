@@ -78,6 +78,16 @@ async def mavsdk_main():
 class OdomBridge(Node):
     def __init__(self):
         super().__init__("px4_odom_bridge")
+
+        # Match sim time so timestamps line up with RTAB-Map
+        self.set_parameters([
+            rclpy.parameter.Parameter(
+                "use_sim_time",
+                rclpy.parameter.Parameter.Type.BOOL,
+                True,
+            )
+        ])
+
         self.tfb = TransformBroadcaster(self)
         self.static_tfb = StaticTransformBroadcaster(self)
         # from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
@@ -138,6 +148,12 @@ class OdomBridge(Node):
         odom.pose.pose.position.y = y_enu
         odom.pose.pose.position.z = z_enu
         odom.pose.pose.orientation = t.transform.rotation
+        odom.pose.covariance[0] = 0.001
+        odom.pose.covariance[7] = 0.001
+        odom.pose.covariance[14] = 0.001
+        odom.pose.covariance[21] = 0.001
+        odom.pose.covariance[28] = 0.001
+        odom.pose.covariance[35] = 0.001
         self.odom_pub.publish(odom)
 
 

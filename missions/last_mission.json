@@ -1,13 +1,13 @@
 {
-  "action": "patrol_route",
-  "route": "perimeter",
+  "action": "follow_target",
+  "route": null,
   "waypoints": [],
-  "altitude_m": 5.0,
+  "altitude_m": 8.0,
   "speed_ms": 5.0,
   "loops": 1,
   "return_to_launch": true,
-  "target_class": null,
-  "follow_duration_s": 30.0,
+  "target_class": "person",
+  "follow_duration_s": 40.0,
   "search_yaw_rate_deg_s": 20.0,
-  "reasoning": "offline keyword parse matched route 'perimeter'"
+  "reasoning": "offline parse: follow_target 'person'"
 }
