@@ -1,13 +1,20 @@
 {
-  "action": "follow_target",
-  "route": null,
+  "action": "squad_patrol",
+  "route": "perimeter",
   "waypoints": [],
-  "altitude_m": 8.0,
+  "altitude_m": 15.0,
   "speed_ms": 5.0,
-  "loops": 1,
+  "loops": 2,
   "return_to_launch": true,
-  "target_class": "person",
-  "follow_duration_s": 40.0,
+  "target_class": null,
+  "follow_duration_s": 30.0,
   "search_yaw_rate_deg_s": 20.0,
-  "reasoning": "offline parse: follow_target 'person'"
+  "goal_x_m": null,
+  "goal_y_m": null,
+  "goal_yaw_deg": 0.0,
+  "n_drones": 2,
+  "formation": "line",
+  "spacing_m": 5.0,
+  "mode": "mirror",
+  "reasoning": "offline parse: squad_patrol 'perimeter' n=2 line/mirror"
 }

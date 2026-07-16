@@ -1,8 +1,10 @@
 """Entry point: prompt -> LLM -> validated mission JSON -> executor -> PX4 SITL.
 
 Dispatches on plan.action:
-  - patrol_route, fly_waypoints, return_home -> waypoint executor
-  - follow_target                            -> follow controller
+  - patrol_route, fly_waypoints, return_home -> waypoint executor (executor.py)
+  - follow_target                            -> follow controller (follow_controller.py)
+  - squad_patrol                             -> squad executor  (squad_executor.py)
+  - navigate_to                              -> nav2 client (executor_nav2.py, TBD)
 """
 import argparse
 import asyncio
@@ -22,6 +24,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--mission")
     ap.add_argument("--sim", default="udpin://0.0.0.0:14540")
+    ap.add_argument("--base-port", type=int, default=14540,
+                    help="Base MAVLink port. Squad missions use base, base+1, ...")
     args = ap.parse_args()
 
     routes = load_routes(str(pathlib.Path(__file__).parent / "routes.yaml"))
@@ -54,10 +58,12 @@ def main():
         print("[main] dry run — stopping before execution")
         return
 
-    # ---- dispatch on action ----
     if plan.action == Action.FOLLOW_TARGET:
         from .follow_controller import follow
         asyncio.run(follow(plan, system_address=args.sim))
+    elif plan.action == Action.SQUAD_PATROL:
+        from .squad_executor import execute as squad_execute
+        asyncio.run(squad_execute(plan, waypoints, base_port=args.base_port))
     else:
         from .executor import execute
         asyncio.run(execute(plan, waypoints, system_address=args.sim))

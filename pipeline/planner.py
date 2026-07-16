@@ -188,6 +188,48 @@ def plan_offline(prompt: str, routes: dict) -> MissionPlan:
                 reasoning=f"offline parse: navigate_to ({m.group(1)}, {m.group(2)})",
             )
 
+    # squad_patrol intent — "with 2 drones", "3 drones side by side", etc.
+    m_drones = re.search(r"(\d+)\s*drones?", p)
+    if m_drones and int(m_drones.group(1)) >= 2:
+        formation = ("side_by_side"
+                     if any(w in p for w in ("side by side", "side-by-side",
+                                             "abreast", "parallel"))
+                     else "line")
+        mode = "split" if "split" in p else "mirror"
+        sp = re.search(r"(\d+(?:\.\d+)?)\s*m(?:etres?)?\s*apart", p)
+
+        route = next((r for r in routes if r.split("_")[0] in p or r in p), None)
+        if route is None and any(w in p for w in ("perimeter", "patrol", "loop")):
+            route = "perimeter"
+        if route is None and any(w in p for w in ("sweep", "survey", "lawnmower")):
+            route = "survey_lawnmower"
+        if route is None and any(w in p for w in ("inspect", "fence")):
+            route = "inspection"
+        if route is None:
+            raise SystemExit(f"[offline planner] squad prompt but no known route: {prompt!r}")
+
+        loops = 1
+        for word, n in _WORD_NUMBERS.items():
+            if word in p:
+                loops = n
+        m = re.search(r"(\d+)\s*(?:times|loops)", p)
+        if m:
+            loops = int(m.group(1))
+
+        return MissionPlan(
+            action="squad_patrol",
+            route=route,
+            n_drones=int(m_drones.group(1)),
+            formation=formation,
+            mode=mode,
+            spacing_m=float(sp.group(1)) if sp else 5.0,
+            altitude_m=float(alt.group(1)) if alt else 10.0,
+            speed_ms=float(spd.group(1)) if spd else 5.0,
+            loops=loops,
+            reasoning=f"offline parse: squad_patrol '{route}' "
+                      f"n={m_drones.group(1)} {formation}/{mode}",
+        )
+
     # follow_target intent
     if any(w in p for w in ("follow", "chase", "track", "tail")):
         m = re.search(r"(?:follow|chase|track|tail)\s+(?:the\s+|any\s+)?(\w+)", p)

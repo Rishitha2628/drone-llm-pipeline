@@ -54,7 +54,7 @@ async def execute(plan: MissionPlan, waypoints: List[WaypointNED],
             _log("position estimate OK")
             break
 
-    await drone.param.set_param_float("MPC_XY_VEL_MAX", plan.speed_ms)
+    await drone.action.set_maximum_speed(plan.speed_ms)
     _log(f"max speed set to {plan.speed_ms} m/s")
 
     _log("arming")
