@@ -1,9 +1,9 @@
 {
-  "action": "squad_patrol",
-  "route": "perimeter",
+  "action": "patrol_route",
+  "route": "walls_loop",
   "waypoints": [],
-  "altitude_m": 15.0,
-  "speed_ms": 5.0,
+  "altitude_m": 7.0,
+  "speed_ms": 2.0,
   "loops": 2,
   "return_to_launch": true,
   "target_class": null,
@@ -16,5 +16,5 @@
   "formation": "line",
   "spacing_m": 5.0,
   "mode": "mirror",
-  "reasoning": "offline parse: squad_patrol 'perimeter' n=2 line/mirror"
+  "reasoning": "offline parse: patrol_route 'walls_loop'"
 }

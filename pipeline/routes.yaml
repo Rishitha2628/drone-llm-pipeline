@@ -27,3 +27,6 @@ routes:
       - [40, 20]
       - [40, 30]
       - [0, 30]
+  walls_loop:
+    description: "Tight low loop in the box1/box2 corner; keeps two perpendicular walls in depth range for ICP"
+    waypoints: [[2, 2], [2, -4], [-4, -4], [-4, 2]]
