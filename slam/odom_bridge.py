@@ -107,14 +107,37 @@ class OdomBridge(Node):
         t.transform.rotation = euler_to_quat(0.0, 0.35, 0.0)
         self.static_tfb.sendTransform(t)
 
+        # lidar frame for slam_toolbox (x500_lidar_2d scan frame_id is 'link')
+        t2 = TransformStamped()
+        t2.header.stamp = self.get_clock().now().to_msg()
+        t2.header.frame_id = "base_link"
+        t2.child_frame_id = "link"
+        t2.transform.translation.z = 0.1
+        t2.transform.rotation.w = 1.0
+        self.static_tfb.sendTransform(t2)
+
         self.create_timer(0.05, self.publish_state)   # 20 Hz
         self.create_timer(2.0,  self.print_status)    # heartbeat
+        # self.create_timer(2.0, self.print_status)
+        self.create_timer(5.0, self._restamp_statics)   # add this line
         self.get_logger().info("odom bridge ready. static TF sent.")
 
     def print_status(self):
         with S.lock:
             print(f"[odom_bridge] pos_count={S.pos_count} att_count={S.att_count} "
                   f"have_pos={S.have_pos} have_att={S.have_att}")
+    def _restamp_statics(self):
+        now = self.get_clock().now().to_msg()
+        for child, x, z, pitch in (("camera_link", 0.15, 0.0, 0.35),
+                                    ("link", 0.0, 0.1, 0.0)):
+            t = TransformStamped()
+            t.header.stamp = now
+            t.header.frame_id = "base_link"
+            t.child_frame_id = child
+            t.transform.translation.x = x
+            t.transform.translation.z = z
+            t.transform.rotation = euler_to_quat(0.0, pitch, 0.0)
+            self.static_tfb.sendTransform(t)
 
     def publish_state(self):
         with S.lock:

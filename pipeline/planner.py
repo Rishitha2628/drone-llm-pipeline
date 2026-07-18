@@ -198,7 +198,9 @@ def plan_offline(prompt: str, routes: dict) -> MissionPlan:
         mode = "split" if "split" in p else "mirror"
         sp = re.search(r"(\d+(?:\.\d+)?)\s*m(?:etres?)?\s*apart", p)
 
-        route = next((r for r in routes if r.split("_")[0] in p or r in p), None)
+        route = next((r for r in routes if r in p), None)  # exact route name wins
+        if route is None:
+            route = next((r for r in routes if r.split("_")[0] in p), None)
         if route is None and any(w in p for w in ("perimeter", "patrol", "loop")):
             route = "perimeter"
         if route is None and any(w in p for w in ("sweep", "survey", "lawnmower")):
@@ -243,7 +245,9 @@ def plan_offline(prompt: str, routes: dict) -> MissionPlan:
         )
 
     # patrol_route intent (default)
-    route = next((r for r in routes if r.split("_")[0] in p or r in p), None)
+    route = next((r for r in routes if r in p), None)  # exact route name wins
+    if route is None:
+        route = next((r for r in routes if r.split("_")[0] in p), None)
     if route is None and any(w in p for w in ("sweep", "survey", "lawnmower")):
         route = "survey_lawnmower"
     if route is None and any(w in p for w in ("perimeter", "patrol", "loop")):

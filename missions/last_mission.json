@@ -1,10 +1,10 @@
 {
   "action": "patrol_route",
-  "route": "walls_loop",
+  "route": "walls_survey",
   "waypoints": [],
   "altitude_m": 7.0,
   "speed_ms": 2.0,
-  "loops": 2,
+  "loops": 1,
   "return_to_launch": true,
   "target_class": null,
   "follow_duration_s": 30.0,
@@ -16,5 +16,5 @@
   "formation": "line",
   "spacing_m": 5.0,
   "mode": "mirror",
-  "reasoning": "offline parse: patrol_route 'walls_loop'"
+  "reasoning": "offline parse: patrol_route 'walls_survey'"
 }
