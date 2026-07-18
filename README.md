@@ -1,61 +1,272 @@
-# LLM-Commanded Drone Mission Pipeline
+# Drone LLM Pipeline — Omokai Robotics Take-Home
 
-Natural-language prompt → LLM → **validated mission JSON** → **deterministic
-executor** → PX4 SITL. The LLM proposes; it never flies.
+Natural-language drone (and multi-drone) command system:
+**prompt → LLM planner → validated JSON → deterministic executor → PX4 SITL / Gazebo Harmonic.**
 
-```
- ┌────────┐   ┌─────────┐   ┌────────────────┐   ┌───────────────┐   ┌──────────┐
- │ Prompt │──▶│ Planner │──▶│ Schema + Safety│──▶│ Deterministic │──▶│ PX4 SITL │
- │  (NL)  │   │  (LLM)  │   │   Validator    │   │   Executor    │   │ (Gazebo) │
- └────────┘   └─────────┘   └────────────────┘   └───────────────┘   └──────────┘
-                   ▲                │ rejected plans fed back
-                   └────────────────┘ (max 2 retries, then hard reject)
-```
+All three senior challenges are implemented and demonstrated:
 
-## Quick start (Docker, recommended)
+| Deliverable | Status | Evidence |
+|---|---|---|
+| Core task — NL patrol missions | ✅ working | `demo/` video, mission audit logs |
+| Challenge 1 — multi-drone formations | ✅ working | 2-drone line & side-by-side, mirror/split modes |
+| Challenge 2 — SLAM (online mapping + localization) | ✅ working | slam_toolbox occupancy map, `docs/evidence/walls_map.pgm` |
+| Challenge 3 — vision detect + follow | ✅ working | YOLOv8 detection JPGs, moving-target follow video |
+| LLM providers | ✅ Gemini (live-tested), Groq, Anthropic | env-switchable |
+
+See `docs/APPROACH.md` for architecture, design decisions, and an honest account of
+what was hard (especially Challenge 2).
+
+---
+
+## 1. Prerequisites
+
+| Requirement | Version | Notes |
+|---|---|---|
+| OS | Ubuntu 22.04 | tested natively |
+| PX4-Autopilot | v1.15+ (Gazebo Harmonic / `gz sim`) | built at `~/PX4-Autopilot` |
+| ROS 2 | Humble | needed for Challenge 2 (SLAM) only |
+| Python | 3.10 | system python for ROS interop |
+| Docker + Compose v2 | any recent | optional — runs the pipeline container |
+| NVIDIA GPU | optional | hybrid-graphics laptops need the PRIME env vars below |
 
 ```bash
-docker compose up -d px4-sim          # PX4 SITL + headless Gazebo
-export ANTHROPIC_API_KEY=sk-ant-...   # or use --no-llm (offline parser)
-docker compose run pipeline "Patrol the perimeter loop twice at 15 metres"
+# Python deps (native path)
+pip3 install --user pydantic mavsdk pyyaml requests ultralytics opencv-python numpy
+
+# ROS 2 packages for Challenge 2
+sudo apt install ros-humble-slam-toolbox ros-humble-ros-gz-bridge \
+                 ros-humble-tf2-ros ros-humble-nav2-map-server \
+                 ros-humble-diagnostic-updater
 ```
 
-## Native install (Ubuntu 22.04/24.04)
+### Hybrid graphics (AMD iGPU + NVIDIA dGPU)
+
+Every Gazebo *and* RViz launch on such machines needs:
 
 ```bash
-python3 -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
-# PX4 SITL (one-time):
-git clone https://github.com/PX4/PX4-Autopilot --recursive
-cd PX4-Autopilot && make px4_sitl gz_x500      # terminal 1
-# then, in this repo:
-python -m pipeline.main "Patrol the perimeter loop twice at 15 metres"
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia QT_QPA_PLATFORM=xcb <command>
 ```
 
-## Commands to try
+Without it, Gazebo may render on the wrong GPU (blank window) and RViz point
+displays silently fail to draw.
 
-| Prompt | Expected behaviour |
-|---|---|
-| `"Patrol the perimeter loop twice at 15 metres"` | Square loop ×2 at 15 m, then RTL |
-| `"Drive the inspection route and return to start"` | L-shaped route, 10 m default |
-| `"Sweep the survey area at 8 m/s"` | Lawnmower pattern at 8 m/s |
-| `"Patrol the perimeter at 60 metres"` | **REJECTED** — altitude above 50 m limit |
-| `--mission missions/last_mission.json` | Replays an audited mission byte-for-byte |
+### DDS transport (important for long sessions)
 
-Useful flags: `--no-llm` (offline deterministic parser, no API key needed),
-`--dry-run` (plan + validate only), `--sim udp://:14540` (MAVSDK address).
+FastDDS shared-memory transport degrades across many node restarts. Force UDP once:
 
-## Guardrails (validator layer)
+```bash
+echo 'export FASTDDS_BUILTIN_TRANSPORTS=UDPv4' >> ~/.bashrc
+```
 
-Hard limits, invisible to the LLM: altitude 2–50 m, speed 0.5–12 m/s, ≤10
-loops, ≤50 waypoints, 200 m geofence around home, only whitelisted actions
-and named routes. Every executed mission is written to
-`missions/last_mission.json` for audit/replay.
+---
 
-## Sources / citations
+## 2. LLM configuration
 
-- **PX4 Autopilot + SITL** — github.com/PX4/PX4-Autopilot (BSD-3) — flight stack + simulator.
-- **MAVSDK-Python** — github.com/mavlink/MAVSDK-Python (BSD-3) — offboard/telemetry API; executor structure adapted from its `offboard_position_ned.py` example.
-- **jonasvautherin/px4-gazebo-headless** (BSD-3) — headless PX4 SITL Docker image used in docker-compose.
-- **ChatDrones** — github.com/Gaurang-1402/ChatDrones (MIT) — referenced for the NL→JSON command pattern; no code copied.
-- Architecture write-up: see `docs/APPROACH.md`.
+Copy the template and add a key for **one** provider (Gemini free tier is enough):
+
+```bash
+cp .env.example .env    # then edit
+# or export directly:
+export LLM_PROVIDER=gemini
+export GEMINI_API_KEY="your-key"           # aistudio.google.com
+export PLANNER_MODEL="gemini-2.5-flash-lite"  # good free-tier RPM
+```
+
+Every mission also runs fully offline with `--no-llm` (deterministic keyword
+parser, same JSON contract) — the examiner needs **no API key** to fly anything.
+
+---
+
+## 3. Quick start — core task
+
+Terminal A (sim — keep open; closing it kills PX4):
+
+```bash
+cd ~/PX4-Autopilot
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia QT_QPA_PLATFORM=xcb \
+  make px4_sitl gz_x500
+```
+
+Terminal B — fly:
+
+```bash
+cd drone-llm-pipeline
+python3 -m pipeline.main --no-llm "Patrol the perimeter loop twice at 15 metres"
+# with a real LLM:
+python3 -m pipeline.main "check the fence line, keep it around 12 meters, come back when done"
+# validation only:
+python3 -m pipeline.main --no-llm --dry-run "..."
+```
+
+Every validated mission is audited to `missions/last_mission.json`.
+
+### Docker path (pipeline only)
+
+The **pipeline** runs containerized; the **simulator runs natively** (GPU GUI +
+Gazebo's shared-memory camera transport are not container-friendly — a real
+deployment would package the sim separately anyway).
+
+```bash
+docker compose run --rm --build pipeline --no-llm "Patrol the perimeter loop twice at 15 metres"
+```
+
+`docker-compose.yml` uses `network_mode: host` so the container reaches native
+PX4 on `localhost:14540`, and forwards `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`/
+`GROQ_API_KEY` from your environment. Do **not** start a containerized PX4
+alongside the native one — they will fight over port 14540.
+
+The vision node (Challenge 3) must run natively: the Gazebo camera topic lives
+on a shared-memory transport that containers cannot see.
+
+---
+
+## 4. Challenge 3 — vision detect + follow
+
+```bash
+# Terminal A: camera drone
+cd ~/PX4-Autopilot
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia QT_QPA_PLATFORM=xcb \
+  PX4_GZ_WORLD=lawn make px4_sitl gz_x500_mono_cam
+
+# Terminal B: spawn a walking person (Actor) — see docs/APPROACH.md for the SDF
+# (world name must match: /world/lawn/create)
+
+# Terminal C: detector (native python, NOT venv/docker)
+export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+python3 -m vision.detector --target person
+
+# Terminal D: follow mission
+python3 -m pipeline.main --no-llm "take off to 8 metres and follow the person for 40 seconds"
+```
+
+Annotated JPGs (bounding box + TARGET DETECTED banner) land in `detections/` —
+this is the "send a picture to the operator" requirement. Target class is
+LLM-configurable (`target_class` field) and whitelist-enforced by the validator
+(try `"follow the giraffe"` to see a rejection).
+
+---
+
+## 5. Challenge 1 — multi-drone formations
+
+```bash
+# Terminal A: drone 0 + Gazebo
+cd ~/PX4-Autopilot
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia QT_QPA_PLATFORM=xcb \
+  PX4_GZ_WORLD=lawn make px4_sitl gz_x500
+
+# Terminal B: drone 1 (attaches to the running Gazebo, spawns 5 m south)
+bash slam/launch_two_drones.sh
+
+# Clear PX4's camera-follow so both drones stay in frame:
+gz service -s /gui/follow --reqtype gz.msgs.StringMsg --reptype gz.msgs.Boolean \
+  --timeout 2000 --req 'data: ""'
+
+# Terminal C: fly
+python3 -m pipeline.main --no-llm \
+  "patrol the perimeter twice at 15 metres with 2 drones in a line 5m apart"
+# or: "... side by side ..." / "... split the route ..."
+```
+
+The LLM (or offline parser) chooses formation (`line`/`side_by_side`) and mode
+(`mirror`/`split`). Safety: spacing is validator-clamped to ≥2 m, drones sync at
+**every waypoint** via an asyncio barrier, fly on separated altitude shelves
+(+2 m per drone), and offsets are **home-aware** (each PX4 instance's NED origin
+is its own spawn point — see APPROACH.md for the collision bug this prevents).
+
+> `HOME_OFFSETS_NED` in `pipeline/squad_executor.py` must match the spawn pose
+> in `slam/launch_two_drones.sh`. Production version would read
+> `telemetry.home()` at runtime.
+
+---
+
+## 6. Challenge 2 — SLAM (2D lidar + slam_toolbox, walls world)
+
+Startup order matters (any sim-time node started before `/clock` exists will
+wall-clock-stamp and poison message filters):
+
+```bash
+# Terminal A: lidar drone in the walls world
+cd ~/PX4-Autopilot
+__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia QT_QPA_PLATFORM=xcb \
+  PX4_GZ_WORLD=walls make px4_sitl gz_x500_lidar_2d
+
+# Terminal B: bridge (scan + clock; config renames the long gz topic to /scan)
+ros2 run ros_gz_bridge parameter_bridge --ros-args -p config_file:=slam/bridge_scan.yaml
+
+# Terminal C: PX4 odometry -> ROS odom + TF (MUST pass sim time on the CLI)
+python3 -m slam.odom_bridge --ros-args -p use_sim_time:=true
+# wait for "MAVSDK connected"
+
+# Terminal D: verification gate — all three columns live, gap < 0.1 s
+python3 -m slam.stamp_check
+
+# Terminal E: slam_toolbox (script exists because the CLI sim-time flag is
+# mandatory — the params file alone does not apply it on this Humble build)
+bash slam/launch_slam_toolbox.sh
+
+# Terminal F: coverage flight past all four walls (collision-verified route)
+python3 -m pipeline.main --no-llm "patrol the walls_survey once at 7 metres at 2 m/s"
+
+# After landing — save the map (nav2 map_saver fails on QoS; direct saver works):
+python3 slam/map_save.py     # writes challenge2-evidence/walls_map.pgm/.yaml
+```
+
+RViz (launch with the NVIDIA env prefix): Fixed Frame `map`; Map display with
+**Durability = Transient Local**; LaserScan `/scan` with **Reliability = Best
+Effort**, Size 0.15, Decay 1; TF display shows the drone.
+
+The saved artifact from our run: `docs/evidence/walls_map.pgm` (598 occupied
+cells, 0.1 m resolution). Challenge 2 was by far the hardest part of this task —
+`docs/APPROACH.md` §Challenge 2 documents every failure mode we hit and how each
+was diagnosed, including why depth-camera ICP odometry is structurally
+degenerate on this airframe.
+
+---
+
+## 7. Repository structure
+
+```
+pipeline/
+  schema.py            # MissionPlan — the strict LLM<->executor contract
+  validator.py         # safety limits: altitude/speed/geofence/whitelist/spacing
+  planner.py           # LLM providers (gemini/groq/anthropic) + offline parser
+  executor.py          # single-drone MAVSDK offboard executor
+  squad_executor.py    # multi-drone decomposition + barrier-synced execution
+  follow_controller.py # vision follow P-controller (yaw + forward, hover on loss)
+  target_state.py      # detector -> controller shared-state contract
+  routes.yaml          # named route whitelist (incl. walls_survey coverage route)
+  main.py              # entry point + dispatch
+vision/
+  detector.py          # YOLOv8n on the Gazebo camera; saves annotated JPGs
+slam/
+  odom_bridge.py       # PX4 telemetry -> /odom + TF (sim-time safe, restamped statics)
+  bridge_scan.yaml     # ros_gz_bridge config (scan + clock)
+  slam_params.yaml     # slam_toolbox params incl. /scan QoS override
+  launch_slam_toolbox.sh
+  launch_two_drones.sh # second PX4 instance for Challenge 1
+  stamp_check.py       # QoS-correct stamp diagnostics (the CLI tools lie)
+  map_save.py          # direct /map -> PGM+YAML saver
+docs/
+  APPROACH.md          # architecture, decisions, per-challenge write-up, lessons
+  evidence/            # map artifact, detection JPGs, screenshots
+demo/                  # recorded demo videos
+Dockerfile, docker-compose.yml, .env.example
+```
+
+## 8. Known gotchas (each cost us real debugging time)
+
+- **Stray `mavsdk_server` processes** survive unclean Python exits, hold UDP
+  14540, and silently eat PX4 heartbeats. Every unexplained "bind error: Address
+  in use" or dead telemetry: `pkill -f mavsdk_server`.
+- **Closing the PX4 terminal kills PX4** — keep Terminal A sacred.
+- **`use_sim_time` must be passed on the node's command line** (`--ros-args -p
+  use_sim_time:=true`); params-file-only or post-hoc setting silently fails for
+  some Humble nodes.
+- **`ros2 topic echo/hz` and `tf2_monitor` are unreliable** under QoS mismatch
+  and stale daemons (`ros2 daemon stop`). Trust the QoS-matched probes in
+  `slam/`.
+- **ros_gz_bridge CLI remaps don't apply to bridged topics** — use a YAML
+  `config_file` to rename.
+- PX4 auto-sets **Gazebo camera-follow** on boot — clear it for formation shots.
+- World name changes topic prefixes (`/world/lawn/...` vs `/world/walls/...`);
+  spawn service calls against the wrong world time out silently.
