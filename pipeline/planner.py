@@ -41,6 +41,9 @@ Rules:
 - For "follow X" instructions use action "follow_target" with target_class=X.
 - For "go to (X, Y)" or "navigate to <point>" on ground robots use action
   "navigate_to" with goal_x_m and goal_y_m.
+- For missions involving MULTIPLE drones ("2 drones", "squad", "team", "in
+  formation"), use action "squad_patrol" with n_drones, formation ("line" or
+  "side_by_side"), spacing_m, and mode ("mirror" or "split").
 - Respect any altitude / speed / repetition the operator states. Defaults:
   altitude 10 m, speed 5 m/s, 1 loop.
 - Put a one-line justification in "reasoning".
@@ -114,7 +117,8 @@ def _gemini_call(system: str, messages: list) -> str:
         },
         timeout=60,
     )
-    resp.raise_for_status()
+    if not resp.ok:
+        raise SystemExit(f"[gemini] HTTP {resp.status_code}: {resp.text[:300]}")
     return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
 
 

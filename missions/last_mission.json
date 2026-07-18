@@ -1,9 +1,9 @@
 {
-  "action": "patrol_route",
-  "route": "walls_survey",
+  "action": "return_home",
+  "route": null,
   "waypoints": [],
-  "altitude_m": 7.0,
-  "speed_ms": 2.0,
+  "altitude_m": 10.0,
+  "speed_ms": 5.0,
   "loops": 1,
   "return_to_launch": true,
   "target_class": null,
@@ -16,5 +16,5 @@
   "formation": "line",
   "spacing_m": 5.0,
   "mode": "mirror",
-  "reasoning": "offline parse: patrol_route 'walls_survey'"
+  "reasoning": "The requested target 'giraffe' is not in the safety whitelist, so the mission is aborted and the drone is returning home."
 }

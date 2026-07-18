@@ -11,7 +11,7 @@ All three senior challenges are implemented and demonstrated:
 | Challenge 1 — multi-drone formations | ✅ working | 2-drone line & side-by-side, mirror/split modes |
 | Challenge 2 — SLAM (online mapping + localization) | ✅ working | slam_toolbox occupancy map, `docs/evidence/walls_map.pgm` |
 | Challenge 3 — vision detect + follow | ✅ working | YOLOv8 detection JPGs, moving-target follow video |
-| LLM providers | ✅ Gemini (live-tested), Groq, Anthropic | env-switchable |
+| LLM providers | ✅ Gemini live-tested (gemini-3.1-flash-lite); Groq, Anthropic wired | env-switchable |
 
 See `docs/APPROACH.md` for architecture, design decisions, and an honest account of
 what was hard (especially Challenge 2).
@@ -69,8 +69,14 @@ cp .env.example .env    # then edit
 # or export directly:
 export LLM_PROVIDER=gemini
 export GEMINI_API_KEY="your-key"           # aistudio.google.com
-export PLANNER_MODEL="gemini-2.5-flash-lite"  # good free-tier RPM
+export PLANNER_MODEL="gemini-3.1-flash-lite"   # current free-tier model
 ```
+
+> **Model availability:** Google gates older models for newly-created keys — a
+> 404 naming the model ("no longer available to new users") means exactly that.
+> List what your key can call:
+> `curl -s "https://generativelanguage.googleapis.com/v1beta/models?key=$GEMINI_API_KEY"`
+> and pick a current flash-tier model.
 
 Every mission also runs fully offline with `--no-llm` (deterministic keyword
 parser, same JSON contract) — the examiner needs **no API key** to fly anything.
@@ -91,11 +97,12 @@ Terminal B — fly:
 
 ```bash
 cd drone-llm-pipeline
-python3 -m pipeline.main --no-llm "Patrol the perimeter loop twice at 15 metres"
-# with a real LLM:
+# LLM-planned mission (the headline path):
 python3 -m pipeline.main "check the fence line, keep it around 12 meters, come back when done"
-# validation only:
-python3 -m pipeline.main --no-llm --dry-run "..."
+# no API key? identical JSON contract via the offline parser:
+python3 -m pipeline.main --no-llm "Patrol the perimeter loop twice at 15 metres"
+# validation only (no sim needed):
+python3 -m pipeline.main --dry-run "..."
 ```
 
 Every validated mission is audited to `missions/last_mission.json`.
@@ -136,7 +143,8 @@ export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 python3 -m vision.detector --target person
 
 # Terminal D: follow mission
-python3 -m pipeline.main --no-llm "take off to 8 metres and follow the person for 40 seconds"
+python3 -m pipeline.main "take off to 8 metres and follow the person for 40 seconds"
+# offline fallback: add --no-llm
 ```
 
 Annotated JPGs (bounding box + TARGET DETECTED banner) land in `detections/` —
@@ -162,9 +170,10 @@ gz service -s /gui/follow --reqtype gz.msgs.StringMsg --reptype gz.msgs.Boolean 
   --timeout 2000 --req 'data: ""'
 
 # Terminal C: fly
-python3 -m pipeline.main --no-llm \
+python3 -m pipeline.main \
   "patrol the perimeter twice at 15 metres with 2 drones in a line 5m apart"
 # or: "... side by side ..." / "... split the route ..."
+# offline fallback: add --no-llm (same JSON contract)
 ```
 
 The LLM (or offline parser) chooses formation (`line`/`side_by_side`) and mode
@@ -205,7 +214,8 @@ python3 -m slam.stamp_check
 bash slam/launch_slam_toolbox.sh
 
 # Terminal F: coverage flight past all four walls (collision-verified route)
-python3 -m pipeline.main --no-llm "patrol the walls_survey once at 7 metres at 2 m/s"
+python3 -m pipeline.main "patrol the walls_survey once at 7 metres at 2 m/s"
+# offline fallback: add --no-llm
 
 # After landing — save the map (nav2 map_saver fails on QoS; direct saver works):
 python3 slam/map_save.py     # writes challenge2-evidence/walls_map.pgm/.yaml
