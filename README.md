@@ -1,4 +1,4 @@
-# Drone LLM Pipeline — Omokai Robotics Take-Home
+# Drone LLM Pipeline
 
 Natural-language drone (and multi-drone) command system:
 **prompt → LLM planner → validated JSON → deterministic executor → PX4 SITL / Gazebo Harmonic.**
@@ -30,8 +30,10 @@ what was hard (especially Challenge 2).
 | NVIDIA GPU | optional | hybrid-graphics laptops need the PRIME env vars below |
 
 ```bash
-# Python deps (native path)
-pip3 install --user pydantic mavsdk pyyaml requests ultralytics opencv-python numpy
+# Python deps (native path) — versions pinned to the tested environment
+pip3 install --user mavsdk==3.15.3 pydantic==2.13.4 pyyaml==6.0.2 \
+                    requests==2.32.3 ultralytics==8.4.92 \
+                    opencv-python==4.10.0.84 numpy==1.26.4
 
 # ROS 2 packages for Challenge 2
 sudo apt install ros-humble-slam-toolbox ros-humble-ros-gz-bridge \
@@ -107,23 +109,39 @@ python3 -m pipeline.main --dry-run "..."
 
 Every validated mission is audited to `missions/last_mission.json`.
 
-### Docker path (pipeline only)
-
-The **pipeline** runs containerized; the **simulator runs natively** (GPU GUI +
-Gazebo's shared-memory camera transport are not container-friendly — a real
-deployment would package the sim separately anyway).
+### Fully containerized quick start (zero native installs)
 
 ```bash
-docker compose run --rm --build pipeline --no-llm "Patrol the perimeter loop twice at 15 metres"
+docker compose --profile sim up -d px4-sim     # headless PX4 SITL (wait ~30 s for "Ready for takeoff!")
+docker compose run --rm pipeline --no-llm "Patrol the perimeter loop twice at 15 metres"
+docker compose --profile sim down
 ```
 
-`docker-compose.yml` uses `network_mode: host` so the container reaches native
-PX4 on `localhost:14540`, and forwards `ANTHROPIC_API_KEY`/`GEMINI_API_KEY`/
-`GROQ_API_KEY` from your environment. Do **not** start a containerized PX4
-alongside the native one — they will fight over port 14540.
+Tested end-to-end: arm → takeoff → 2 patrol laps (10 waypoints) → RTL → land,
+verified in executor and PX4 logs. The sim container runs PX4 v1.14 headless
+with ulogs mounted on tmpfs — a prior session filled ~60 GB of disk through
+container-layer logging; the tmpfs mount makes recurrence impossible.
 
-The vision node (Challenge 3) must run natively: the Gazebo camera topic lives
-on a shared-memory transport that containers cannot see.
+The pipeline container also runs against the **native** sim (same
+`network_mode: host`, PX4 on `localhost:14540`), and forwards
+`GEMINI_API_KEY` / `GROQ_API_KEY` / `ANTHROPIC_API_KEY` plus `LLM_PROVIDER` /
+`PLANNER_MODEL` from your environment — the live-LLM path was verified running
+inside the container. Do **not** run the containerized sim and a native PX4
+simultaneously; they fight over port 14540.
+
+**Containerization scope** (claims match what was tested):
+
+| Component | Containerized? | Why |
+|---|---|---|
+| Core task (headless sim + pipeline) | ✅ tested end-to-end | two-command flow above |
+| LLM planning (all providers) | ✅ tested in-container | env-forwarded keys |
+| Challenge 1 multi-drone | ❌ native sim | second PX4 instance + port isolation not containerized |
+| Challenge 3 vision | ❌ native | Gazebo camera rides shared-memory transport; not visible across containers |
+| Challenge 2 SLAM | ❌ native | host ROS 2 graph (bridge / TF / slam_toolbox) |
+
+Containerizing the remaining components (per-vehicle sim services, ROS graph
+in a compose network) is follow-on packaging work; the challenge demos use the
+native setup documented per-section below.
 
 ---
 

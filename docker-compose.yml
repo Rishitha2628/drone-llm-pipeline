@@ -8,7 +8,10 @@ services:
   px4-sim:
     image: jonasvautherin/px4-gazebo-headless:1.14.3
     network_mode: host
-    command: ["127.0.0.1", "127.0.0.1"]
+    command: ["127.0.0.1"]
+    profiles: ["sim"]
+    tmpfs:
+      - /root/Firmware/build/px4_sitl_default/rootfs/log
 
   pipeline:
     build: .
